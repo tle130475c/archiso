@@ -20,6 +20,32 @@ Fixed
 Removed
 -------
 
+[77] - 2024-04-21
+=================
+
+Added
+-----
+
+- Copy Memtest86+ EFI binary to the EFI system partition and ISO 9660 for ``uefi-x86.systemd-boot`` boot modes.
+  Additionally, create a boot entry with it for the releng profile.
+
+Changed
+-------
+
+- Change releng profile's bootstrap tarball compression from gzip to zstd. zstd provides higher and faster compression.
+- Use mkinitcpio's ``microcode`` hook instead of external microcode images to simplify boot loader configuration.
+  Custom PXE setups will need to update their boot loader configuration.
+- Replace ``archisodevice`` boot parameter with ``archisosearchuuid`` in all boot loader configuration. This allows to
+  have "file system transposition" without relaying on GRUB-specific features.
+- Replace GRUB with systemd-boot as the UEFI boot loader for the releng profile. While this increases the ISO size, it
+  avoids all GRUB-specific annoyances and oddities.
+
+Fixed
+-----
+
+- Fix requirement validation logic for the ``uefi-ia32.systemd-boot.eltorito`` boot mode. It incorrectly applied the
+  same requirements as ``uefi-x64.systemd-boot.esp``.
+
 [76] - 2024-03-30
 =================
 
