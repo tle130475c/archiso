@@ -11,11 +11,19 @@ Added
 Changed
 -------
 
+- Moved the ``pkglist.x86_64.txt`` file outside the bootstrap tarball's ``root.x86_64`` directly to avoid polluting the
+  root file system.
+- Use 4 MiB OVMF files in ``run_archiso`` instead of the old 2 MiB ones.
+
 Deprecated
 ----------
 
 Fixed
 -----
+
+- Look for microcode update files in the initramfs images when checking if external microcode images are needed. The
+  existence of a ``early_cpio`` file is not enough since mkinitcpio can and will place other files in the early
+  uncompressed CPIO even when the ``microcode`` hook is not used.
 
 Removed
 -------
