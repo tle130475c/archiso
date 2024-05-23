@@ -11,12 +11,32 @@ Added
 Changed
 -------
 
+Deprecated
+----------
+
+Fixed
+-----
+
+Removed
+-------
+
+[78] - 2024-05-23
+=================
+
+Changed
+-------
+
 - Moved the ``pkglist.x86_64.txt`` file outside the bootstrap tarball's ``root.x86_64`` directly to avoid polluting the
   root file system.
 - Use 4 MiB OVMF files in ``run_archiso`` instead of the old 2 MiB ones.
-
-Deprecated
-----------
+- Increase the additional free space of the EFI partition size from 1 MiB to 8 MiB to account for file system overhead
+  when using FAT32 (needs less than 1 MiB) and to give more space for adding custom files when repacking an ISO (e.g.
+  when preparing it for Secure Boot).
+- Remove 300 KiB padding needed for CDs if the ISO exceeds the maximum size of a CD.
+- Use ``xz -9e`` as the releng profile's initramfs compression. Now that mkinitcpio does not decompress the loadable
+  kernel modules and firmware files anymore and moves them to the early uncompressed initramfs, we can compress the main
+  initramfs image with a higher compression without it having much impact on the ISO build time.
+- Format the EFI system partition image as FAT32 if the size allows it (i.e. if it is at least 36 MiB).
 
 Fixed
 -----
@@ -27,6 +47,9 @@ Fixed
 
 Removed
 -------
+
+- Remove the wezterm-terminfo package from the releng profile as the relevant file is now provided by the ncurses
+  package instead.
 
 [77] - 2024-04-21
 =================
