@@ -8,8 +8,14 @@ Changelog
 Added
 -----
 
+- Support compressing the bootstrap tarball with ``xz``.
+
 Changed
 -------
+
+- Use an empty UUID for the EROFS image file since the file system will never be referenced by it.
+- Do not use ``mkfs.erofs`` extended options ``fragments`` and ``dedupe`` in the baseline profile. This reduces the EROFS
+  image size and compression time.
 
 Deprecated
 ----------
