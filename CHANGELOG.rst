@@ -20,6 +20,18 @@ Fixed
 Removed
 -------
 
+[81] - 2024-10-28
+=================
+
+Fixed
+-----
+
+- Change enabled services in baseline and releng profile to adapt to changes in ``cloud-init`` ≥ 24.3 (renamed
+  ``cloud-init.service`` to ``cloud-init-network.service``, introduced new ``cloud-init-main.service``).
+
+Removed
+-------
+
 - Removed gnu-netcat from releng profile, as cloud-init requires openbsd-netcat and the two netcat versions can not be
   installed side-by-side.
 
