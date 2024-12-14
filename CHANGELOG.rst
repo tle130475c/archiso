@@ -20,6 +20,16 @@ Fixed
 Removed
 -------
 
+
+[82] - 2024-11-27
+=================
+
+Fixed
+-----
+
+- Commented out ``DownloadUser`` in ``pacman.conf`` so that the working directory is not restricted to paths to which
+  the ``alpm`` user has access to.
+
 [81] - 2024-10-28
 =================
 
