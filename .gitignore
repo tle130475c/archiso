@@ -3,6 +3,7 @@
 *.tar.*
 work/
 out/
+private_user_data
 codesigning*
 *.iso
 *.img
