@@ -127,5 +127,5 @@ xfsprogs
 xl2tpd
 zsh
 emacs
-jdk-openjdk
+jdk21-openjdk
 maven
