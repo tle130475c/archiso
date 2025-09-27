@@ -44,19 +44,15 @@ The image file is constructed from some of the variables in ``profiledef.sh``: `
 * ``bootmodes``: A list of strings, that state the supported boot modes of the resulting image. Only the following are
   understood:
 
-  - ``bios.syslinux.mbr``: Syslinux for x86 BIOS booting from a disk
-  - ``bios.syslinux.eltorito``: Syslinux for x86 BIOS booting from an optical disc
-  - ``uefi-ia32.grub.esp``: GRUB for IA32 UEFI booting from a disk
-  - ``uefi-ia32.grub.eltorito``: GRUB for IA32 UEFI booting from an optical disc
-  - ``uefi-x64.grub.esp``: GRUB for x64 UEFI booting from a disk
-  - ``uefi-x64.grub.eltorito``: GRUB for x64 UEFI booting from an optical disc
-  - ``uefi-ia32.systemd-boot.esp``: systemd-boot for IA32 UEFI booting from a disk
-  - ``uefi-ia32.systemd-boot.eltorito``: systemd-boot for IA32UEFI booting from an optical disc
-  - ``uefi-x64.systemd-boot.esp``: systemd-boot for x64 UEFI booting from a disk
-  - ``uefi-x64.systemd-boot.eltorito``: systemd-boot for x64 UEFI booting from an optical disc
-    Note that BIOS El Torito boot mode must always be listed before UEFI El Torito boot mode.
+  - ``bios.syslinux``: Syslinux for x86 BIOS booting
+  - ``uefi.grub``: GRUB for x64 and IA32 UEFI booting
+  - ``uefi.systemd-boot``: systemd-boot for x64 and IA32 UEFI booting
 * ``arch``: The architecture (e.g. ``x86_64``) to build the image for. This is also used to resolve the name of the packages
   file (e.g. ``packages.x86_64``)
+* ``packages``: File path to a text file containing a list of packages to install into the environment in ``iso`` and
+  ``netboot`` build modes (defaults to ``packages.${arch}``).
+* ``bootstrap_packages``: File path to a text file containing a list of packages to install into the environment in the
+  ``bootstrap`` build mode (defaults to ``bootstrap_packages.${arch}``).
 * ``pacman_conf``: The ``pacman.conf`` to use to install packages to the work directory when creating the image (defaults to
   the host's ``/etc/pacman.conf``)
 * ``airootfs_image_type``: The image type to create. The following options are understood (defaults to ``squashfs``):
@@ -75,8 +71,9 @@ The image file is constructed from some of the variables in ``profiledef.sh``: `
 bootstrap_packages.arch
 =======================
 
-All packages to be installed into the environment of a bootstrap image have to be listed in an architecture specific
-file (e.g. ``bootstrap_packages.x86_64``), which resides top-level in the profile.
+All packages to be installed into the environment of a bootstrap image have to be listed in a file specified by the
+``bootstrap_packages`` variable or the architecture specific ``bootstrap_packages.${arch}`` file
+(e.g. ``bootstrap_packages.x86_64``) which resides top-level in the profile, otherwise.
 
 Packages have to be listed one per line. Lines starting with a ``#`` and blank lines are ignored.
 
@@ -85,8 +82,9 @@ This file is required when generating bootstrap images using the ``bootstrap`` b
 packages.arch
 =============
 
-All packages to be installed into the environment of an ISO image have to be listed in an architecture specific file
-(e.g. ``packages.x86_64``), which resides top-level in the profile.
+All packages to be installed into the environment of an ISO image have to be listed in a file specified by the
+``packages`` variable or the architecture specific ``packages.${arch}`` file (e.g. ``packages.x86_64``) which resides
+top-level in the profile, otherwise.
 
 Packages have to be listed one per line. Lines starting with a ``#`` and blank lines are ignored.
 
@@ -154,8 +152,8 @@ overridden:
 efiboot
 -------
 
-This directory is mandatory when the ``uefi-x64.systemd-boot.esp`` or ``uefi-x64.systemd-boot.eltorito`` bootmodes are
-selected in ``profiledef.sh``. It contains configuration for `systemd-boot
+This directory is mandatory when the ``uefi.systemd-boot`` bootmode is selected in ``profiledef.sh``.
+It contains configuration for `systemd-boot
 <https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/>`_.
 
   .. note::
@@ -169,8 +167,7 @@ The *custom template identifiers* are **only** understood in the boot loader ent
 syslinux
 --------
 
-This directory is mandatory when the ``bios.syslinux.mbr`` or the ``bios.syslinux.eltorito`` bootmodes are selected in
-``profiledef.sh``.
+This directory is mandatory when the ``bios.syslinux`` bootmode is selected in ``profiledef.sh``.
 It contains configuration files for `syslinux <https://wiki.syslinux.org/wiki/index.php?title=SYSLINUX>`_ or `isolinux
 <https://wiki.syslinux.org/wiki/index.php?title=ISOLINUX>`_ , or `pxelinux
 <https://wiki.syslinux.org/wiki/index.php?title=PXELINUX>`_ used in the resulting image.
@@ -180,12 +177,6 @@ The *custom template identifiers* are understood in all `.cfg` files in this dir
 grub
 ----
 
-This directory is mandatory when any of the following bootmodes is used in ``profiledef.sh``:
-
-- ``uefi-ia32.grub.esp`` or
-- ``uefi-ia32.grub.eltorito`` or
-- ``uefi-x64.grub.esp`` or
-- ``uefi-x64.grub.eltorito``
-
+This directory is mandatory when the ``uefi.grub`` bootmode is selected in ``profiledef.sh``.
 It contains configuration files for `GRUB <https://www.gnu.org/software/grub/>`_
 used in the resulting image.

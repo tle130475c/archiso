@@ -20,6 +20,51 @@ Fixed
 Removed
 -------
 
+
+[86] - 2025-09-25
+=================
+
+Added
+-----
+
+- Document the ``profiledef.sh`` file's ``packages`` and ``bootstrap_packages`` variables.
+- When using GRUB (only used by the baseline profile) or ``loopback.cfg``, support detecting the UEFI shell on other
+  architectures. This allows to reuse these files in case someone wants to port the profiles to non-x86_64.
+
+Changed
+-------
+
+- ``run_archiso`` defaults to booting the ISO with UEFI since that is the boot mode most people actually use.
+- Use the ``%ARCH%`` *custom template identifier* in the profile boot entry files for syslinux and systemd-boot instead
+  of hardcoding the architecture.
+- GRUB boot entries are shown without the UEFI architecture so that they match systemd-boot's display.
+
+Deprecated
+----------
+
+- The ``bios.syslinux.eltorito`` and ``bios.syslinux.mbr`` boot modes are replaced by the ``bios.syslinux`` boot mode.
+  If you are using ``bios.syslinux.eltorito`` or ``bios.syslinux.mbr`` in your ``profiledef.sh``, replace them with a
+  single ``bios.syslinux``.
+- The ``uefi-x64.systemd-boot.eltorito``, ``uefi-x64.systemd-boot.esp``, ``uefi-ia32.systemd-boot.eltorito`` and
+  ``uefi-ia32.systemd-boot.eltorito`` boot modes are replaced by the single ``uefi.systemd-boot`` boot mode.
+  Both x64 and IA32 architectures are covered by this new combined boot mode.
+  If you are using ``uefi-x64.systemd-boot.eltorito``, ``uefi-x64.systemd-boot.esp``,
+  ``uefi-ia32.systemd-boot.eltorito`` or ``uefi-ia32.systemd-boot.eltorito`` in your ``profiledef.sh``, replace them
+  with a single ``uefi.systemd-boot``.
+- The ``uefi-x64.grub.eltorito``, ``uefi-x64.grub.esp``, ``uefi-ia32.grub.eltorito`` and ``uefi-ia32.grub.eltorito``
+  boot modes are replaced by a single ``uefi.grub``.
+  Both x64 and IA32 architectures are covered by this new combined boot mode.
+  If you are using the ``uefi-x64.grub.eltorito``, ``uefi-x64.grub.esp``, ``uefi-ia32.grub.eltorito`` or
+  ``uefi-ia32.grub.eltorito`` boot modes in your ``profiledef.sh``, replace them with a single ``uefi.grub``.
+
+Fixed
+-----
+
+- Correctly resolve relative paths in the ``profiledef.sh`` file's ``bootstrap_packages`` variable.
+- Do not modify the ``os-release`` file or add a ``version`` file to the bootstrap tarball's ``root.${arch}`` directory.
+  Place the ``version`` file in the tarball's top level directory instead.
+- Do not show the systemd-boot boot entry for x64 Memtest86+ in IA32 UEFI.
+
 [85] - 2025-07-28
 =================
 
