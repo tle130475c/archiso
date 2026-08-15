@@ -8,8 +8,15 @@ Changelog
 Added
 -----
 
+- Support the ``i486`` and ``pentium4`` architectures in the ``run_archiso`` script.
+
 Changed
 -------
+
+- Skip BIOS boot modes for non-x86 architectures, instead of failing, to allow using the same profile for all
+  architectures.
+- Use xz's ``arm64`` BCJ filter, in addition to ``x86``, to better compress the releng profile's squashfs image on
+  AArch64.
 
 Deprecated
 ----------
@@ -17,8 +24,39 @@ Deprecated
 Fixed
 -----
 
+- Create the ``grubenv`` and UUID search files regardless of the order of the ``iso`` and ``netboot`` build modes.
+- Copy the airootfs ``/boot`` directory to the working directory and use it for boot loader setup, so that its files
+  are still available when the ``netboot`` build mode runs before ``iso``.
+
 Removed
 -------
+
+[89] - 2026-07-25
+=================
+
+Added
+-----
+
+- Add ghostty-terminfo and kmscon-terminfo packages to releng to support terminal emulators using them. E.g. when
+  installing via SSH.
+- Support running ``mkarchiso`` as a regular (non-root) user by using ``unshare``. This requires user namespace support
+  in the kernel.
+- Allow BIOS boot modes and check the initramfs for microcode on the ``i486`` and ``pentium4`` architectures.
+
+Changed
+-------
+
+- Replaced the ``ntfs-3g`` package with the ``ntfsprogs`` package in the releng profile since we do not require the FUSE
+  driver, but only the userspace utilities. For now, ``ntfs-3g`` still gets pulled in as a dependency of other packages.
+
+Fixed
+-----
+
+- Stop requiring ``tune2fs`` for ``ext4+squashfs`` images.
+- Validate ``install_dir`` characters for ISO and netboot builds and its length for ISO builds.
+- Reject profiles that use the ``uefi.systemd-boot`` and ``uefi.grub`` boot modes together.
+- Fixed a typo that prevented including the UEFI shell for UEFI architectures other than x64.
+- Correctly support compressing the bootstrap tarball with bzip2.
 
 [88] - 2026-03-26
 =================
