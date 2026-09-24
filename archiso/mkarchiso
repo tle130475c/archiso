@@ -30,6 +30,7 @@ iso_application=""
 iso_version=""
 install_dir=""
 arch=""
+kernel_params=""
 pacman_conf=""
 packages=""
 bootstrap_packages=""
@@ -42,7 +43,7 @@ buildmodes=()
 bootmodes=()
 airootfs_image_type=""
 airootfs_image_tool_options=()
-bootstrap_tarball_compression=""
+bootstrap_tarball_compression=()
 cert_list=()
 declare -A file_permissions=()
 efibootimg=""
@@ -50,6 +51,7 @@ efiboot_files=()
 # adapted from GRUB_EARLY_INITRD_LINUX_STOCK in https://git.savannah.gnu.org/cgit/grub.git/tree/util/grub-mkconfig.in
 readonly ucodes=('intel-uc.img' 'intel-ucode.img' 'amd-uc.img' 'amd-ucode.img' 'early_ucode.cpio' 'microcode.cpio')
 declare -i need_external_ucodes=0
+declare -i use_stubble=0
 readonly -A uefi_arch=(
     ['x86_64']='x64'
     ['aarch64']='AA64'
@@ -114,6 +116,7 @@ usage: ${app_name} [options] <profile_dir>
      -h               This message
      -m [mode ..]     Build mode(s) to use (valid modes are: 'bootstrap', 'iso' and 'netboot').
                       Multiple build modes are provided as quoted, space delimited list.
+                      Default: 'iso'
      -o <out_dir>     Set the output directory
                       Default: '${out_dir}'
      -p [package ..]  Package(s) to install.
@@ -430,6 +433,42 @@ _make_customize_airootfs() {
     fi
 }
 
+# Build an EFI executable containing the kernel and platform device tree
+_make_stubble_efi() {
+    local dtb_path hwids_path kernel kernel_path kernelver module_dir
+    local -a devicetree_args=() dtbs=()
+
+    _msg_info "Generating a stubble EFI executable..."
+    hwids_path="${pacstrap_dir}/usr/lib/systemd/boot/hwids/${uefi_arch[$arch],,}/"
+    [[ -d "${hwids_path}" ]] || _msg_error "The directory '${hwids_path}' does not exist" 1
+
+    for module_dir in "${pacstrap_dir}/usr/lib/modules/"*; do
+        # Skip directories without a pkgbase
+        [[ -f "${module_dir}/pkgbase" ]] || continue
+        pkgbase="$(<"${module_dir}/pkgbase")"
+        kernelver="${module_dir##*/}"
+        [[ -n "${kernelver}" ]] || _msg_error "Could not determine the version of kernel '${kernel}'"
+        kernel_path="${boot_dir}/vmlinuz-${pkgbase}"
+        # Stubble only supports qualcomm devices
+        dtb_path="${pacstrap_dir}/usr/lib/modules/${kernelver}/dtb/qcom/"
+        [[ -d "${dtb_path}" ]] || _msg_error "The directory '${dtb_path}' does not exist" 1
+        _msg_info "Fusing DTBs with the kernel..."
+        # Don't include the EL2 DTBs
+        mapfile -d '' -t dtbs < <(find "${dtb_path}" -maxdepth 1 -type f -name '*.dtb' ! -name '*-el2.dtb' -print0)
+        devicetree_args=("${dtbs[@]/#/--devicetree-auto=}")
+
+        ukify build \
+            --stub="${pacstrap_dir}/usr/lib/stubble/stubble.efi" \
+            --uname="${kernelver}" \
+            --linux="${kernel_path}" \
+            --hwids="${hwids_path}" \
+             "${devicetree_args[@]}" \
+            --output="${kernel_path}"
+    done
+
+    _msg_info "Done! Stubble EFI executable generated successfully."
+}
+
 # Set up boot loaders
 _make_bootmodes() {
     local bootmode
@@ -480,6 +519,7 @@ _make_bootmode_bios.syslinux() {
         sed "s|%ARCHISO_LABEL%|${iso_label}|g;
              s|%ARCHISO_UUID%|${iso_uuid}|g;
              s|%INSTALL_DIR%|${install_dir}|g;
+             s|%KERNEL_PARAMS%|${kernel_params}|g;
              s|%ARCH%|${arch}|g" \
             "${_cfg}" >"${isofs_dir}/boot/syslinux/${_cfg##*/}"
     done
@@ -600,6 +640,7 @@ _make_common_bootmode_grub_cfg() {
         sed "s|%ARCHISO_LABEL%|${iso_label}|g;
              s|%ARCHISO_UUID%|${iso_uuid}|g;
              s|%INSTALL_DIR%|${install_dir}|g;
+             s|%KERNEL_PARAMS%|${kernel_params}|g;
              s|%ARCH%|${arch}|g;
              s|%ARCHISO_SEARCH_FILENAME%|${search_filename}|g" \
             "${_cfg}" >"${work_dir}/grub/${_cfg##*/}"
@@ -681,6 +722,7 @@ _make_common_grubenv_and_loopbackcfg() {
         sed "s|%ARCHISO_LABEL%|${iso_label}|g;
              s|%ARCHISO_UUID%|${iso_uuid}|g;
              s|%INSTALL_DIR%|${install_dir}|g;
+             s|%KERNEL_PARAMS%|${kernel_params}|g;
              s|%ARCH%|${arch}|g;
              s|%ARCHISO_SEARCH_FILENAME%|${search_filename}|g" \
             "${profile}/grub/loopback.cfg" >"${isofs_dir}/boot/grub/loopback.cfg"
@@ -725,7 +767,8 @@ _make_bootmode_uefi.grub() {
         -o "${isofs_dir}/EFI/BOOT/BOOT${uefi_arch[$arch]}.EFI" "boot/grub/grub.cfg=${work_dir}/grub-embed.cfg"
 
     # Create IA32 EFI binary for mixed-mode booting on x86_64 systems with IA32 UEFI
-    if [[ "$arch" == 'x86_64' ]]; then
+    if [[ "$arch" == 'x86_64' && -d '/usr/lib/grub/i386-efi' ]]; then
+        _msg_info "Setting up GRUB for mixed mode booting..."
         grub-mkstandalone -O i386-efi \
             --modules="${grubmodules[*]}" \
             --locales="en@quot" \
@@ -838,6 +881,7 @@ _make_bootmode_uefi.systemd-boot() {
         sed "s|%ARCHISO_LABEL%|${iso_label}|g;
              s|%ARCHISO_UUID%|${iso_uuid}|g;
              s|%INSTALL_DIR%|${install_dir}|g;
+             s|%KERNEL_PARAMS%|${kernel_params}|g;
              s|%ARCH%|${arch}|g" \
             "${_conf}" >"${work_dir}/loader/entries/${_conf##*/}"
     done
@@ -861,7 +905,8 @@ _make_bootmode_uefi.systemd-boot() {
     # Copy EFI binaries and related files
     _make_common_bootmode_uefi.systemd-boot_copy_files "${uefi_arch[$arch]}"
     # Set up mixed mode booting for x86_64 systems with IA32 UEFI
-    if [[ "$arch" == 'x86_64' ]]; then
+    if [[ "$arch" == 'x86_64' && -e "${pacstrap_dir}/usr/lib/systemd/boot/efi/systemd-bootia32.efi" ]]; then
+        _msg_info "Setting up systemd-boot for mixed mode booting..."
         _make_common_bootmode_uefi.systemd-boot_copy_files 'IA32'
     fi
 
@@ -1272,10 +1317,10 @@ _validate_requirements_buildmode_bootstrap() {
     # Check if the compressor is installed
     if (( ${#bootstrap_tarball_compression[@]} )); then
         case "${bootstrap_tarball_compression[0]}" in
-            'bzip2'|'gzip'|'lrzip'|'lzip'|'lzop'|'xz'|'zstd'|'zstdmt')
+            'bzip2'|'gzip'|'lrzip'|'lzip'|'lzop'|'lz4'|'pzstd'|'xz'|'zstd'|'zstdmt')
                 if ! command -v "${bootstrap_tarball_compression[0]}" &>/dev/null; then
                     (( validation_error=validation_error+1 ))
-                    _msg_error "Validating build mode '${_buildmode}': '${bootstrap_tarball_compression[0]}' is not available on this host. Install '${bootstrap_tarball_compression[0]/zstdmt/zstd}'!" 0
+                    _msg_error "Validating build mode '${_buildmode}': '${bootstrap_tarball_compression[0]}' is not available on this host. Install '${bootstrap_tarball_compression[0]/@(pzstd|zstdmt)/zstd}'!" 0
                 fi
                 ;;
             'cat')
@@ -1348,6 +1393,20 @@ _validate_common_requirements_buildmode_iso_netboot() {
     else
         (( validation_error=validation_error+1 ))
         _msg_error "Unsupported image type: '${airootfs_image_type}'" 0
+    fi
+
+    if [[ "$arch" == 'aarch64' ]]; then
+        use_stubble=1
+
+        # shellcheck disable=SC2076
+        if [[ ! " ${pkg_list[*]} " =~ ' stubble ' ]]; then
+            _msg_warning "'stubble' is not in the package list. Device tree files (.dtb) will not be merged in kernel images."
+            use_stubble=0
+        fi
+        if ! command -v ukify &>/dev/null; then
+            _msg_warning "'ukify' is not available on this host. Install 'systemd-ukify' to merge device tree files in kernel images."
+            use_stubble=0
+        fi
     fi
 }
 
@@ -1462,19 +1521,18 @@ _add_xorrisofs_options_uefi.grub() {
 
 # Build bootstrap image
 _build_bootstrap_image() {
-    # Set default tarball compression to uncompressed
-    if (( ! "${#bootstrap_tarball_compression[@]}" )); then
-        bootstrap_tarball_compression=('cat')
-    fi
-
     [[ -d "${out_dir}" ]] || install -d -- "${out_dir}"
 
     cd -- "${bootstrap_parent}"
 
     _msg_info "Creating bootstrap image..."
     rm -f -- "${out_dir:?}/${image_name:?}"
-    _unshare bsdtar -cf - "root.${arch}" "pkglist.${arch}.txt" 'version' \
-        | _unshare "${bootstrap_tarball_compression[@]}" >"${out_dir}/${image_name}"
+    if (( "${#bootstrap_tarball_compression[@]}" == 0 )); then
+        _unshare bsdtar -cf "${out_dir}/${image_name}" "root.${arch}" "pkglist.${arch}.txt" 'version'
+    else
+        _unshare bsdtar -cf - "root.${arch}" "pkglist.${arch}.txt" 'version' \
+            | _unshare "${bootstrap_tarball_compression[@]}" >"${out_dir}/${image_name}"
+    fi
     _msg_info "Done!"
     du -h -- "${out_dir}/${image_name}"
     cd -- "${OLDPWD}"
@@ -1537,6 +1595,9 @@ _build_iso_image() {
 
 # Read profile's values from profiledef.sh
 _read_profile() {
+    # shellcheck disable=SC2034
+    local kernel_params_i486 kernel_params_i686 kernel_params_pentium4 kernel_params_x86_64 kernel_params_aarch64 kernel_params_riscv64 kernel_params_loongarch64
+
     if [[ -z "${profile}" ]]; then
         _msg_error "No profile specified!" 1
     fi
@@ -1553,6 +1614,8 @@ _read_profile() {
 
         # Resolve paths of files that are expected to reside in the profile's directory
         [[ -n "$arch" ]] || arch="$(uname -m)"
+        local kernel_params_var="kernel_params_${arch}"
+        kernel_params="${!kernel_params_var-}"
         # Use "packages" if it exists but "packages.${arch}" does not
         if [[ -z "$packages" && ! -e "${profile}/packages.${arch}" && -e "${profile}/packages" ]]; then
             packages="${profile}/packages"
@@ -1788,6 +1851,11 @@ _build_iso_base() {
     fi
     _run_once _make_customize_airootfs
     _run_once _copy_boot_out_of_pacstrap_dir
+
+    if (( use_stubble )); then
+        _run_once _make_stubble_efi
+    fi
+
     _run_once _make_pkglist
     if [[ "$arch" == @('x86_64'|'i686'|'i486'|'pentium4') ]]; then
         _run_once _check_if_initramfs_has_ucode
@@ -1817,15 +1885,18 @@ _build_buildmode_bootstrap() {
     _unshare install -d -m 0755 -o 0 -g 0 -- "${pacstrap_dir}"
 
     # Set tarball extension
-    case "${bootstrap_tarball_compression[0]}" in
-        'bzip2') image_name="${image_name}.bz2" ;;
-        'gzip') image_name="${image_name}.gz" ;;
-        'lrzip') image_name="${image_name}.lrz" ;;
-        'lzip') image_name="${image_name}.lz" ;;
-        'lzop') image_name="${image_name}.lzo" ;;
-        'xz') image_name="${image_name}.xz" ;;
-        'zstd'|'zstdmt') image_name="${image_name}.zst" ;;
-    esac
+    if (( "${#bootstrap_tarball_compression[@]}" > 0 )); then
+        case "${bootstrap_tarball_compression[0]}" in
+            'bzip2') image_name="${image_name}.bz2" ;;
+            'gzip') image_name="${image_name}.gz" ;;
+            'lrzip') image_name="${image_name}.lrz" ;;
+            'lzip') image_name="${image_name}.lz" ;;
+            'lzop') image_name="${image_name}.lzo" ;;
+            'lz4') image_name="${image_name}.lz4" ;;
+            'xz') image_name="${image_name}.xz" ;;
+            'pzstd'|'zstd'|'zstdmt') image_name="${image_name}.zst" ;;
+        esac
+    fi
 
     [[ "${quiet}" == "y" ]] || _show_config
     _run_once _make_pacman_conf
@@ -1878,13 +1949,18 @@ _build() {
     fi
 }
 
-_unshare() {
-    if (( EUID != 0 )); then
-        unshare --map-auto --map-root-user -- "$@"
-    else
+if (( EUID == 0 )); then
+    _unshare() {
         "$@"
+    }
+    if [[ -v SUDO_USER ]]; then
+        _msg_warning "Running as root is not advised."
     fi
-}
+else
+    _unshare() {
+        unshare --map-auto --map-root-user -- "$@"
+    }
+fi
 
 while getopts 'c:p:C:L:P:A:D:w:m:o:g:G:vrh?' arg; do
     case "${arg}" in
